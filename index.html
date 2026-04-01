@@ -3,104 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D Mobile Runner</title>
+    <title>3D Mobile Runner: Real Chase</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; touch-action: none; }
-        #info { position: absolute; top: 10px; width: 100%; text-align: center; color: white; font-family: sans-serif; pointer-events: none; }
-        #score { font-size: 24px; font-weight: bold; }
+        #info { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-family: sans-serif; pointer-events: none; z-index: 100; }
+        #score { font-size: 30px; font-weight: bold; margin-bottom: 10px; }
     </style>
 </head>
 <body>
     <div id="info">
         <div id="score">Score: 0</div>
-        <p>화면을 왼쪽/오른쪽으로 스와이프하세요!</p>
+        <div style="background: rgba(0,0,0,0.5); display: inline-block; padding: 5px 15px; border-radius: 20px;">
+            🦖 티라노를 피해 달아나세요!
+        </div>
     </div>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
-        let scene, camera, renderer, player;
+        let scene, camera, renderer, player, trex;
         let obstacles = [];
         let score = 0;
         let currentLane = 0; 
         const laneWidth = 3;
-
-        // 터치 시작 위치 저장을 위한 변수
         let touchStartX = 0;
-        let touchEndX = 0;
+
+        // --- [이미지 텍스처 로드] ---
+        const textureLoader = new THREE.TextureLoader();
+        
+        // 중요: 깃허브에 올린 실제 이미지 파일명과 동일해야 합니다.
+        // 배경이 투명한 PNG 파일을 권장합니다.
+        const playerTexture = textureLoader.load('player_texture.png'); 
+        const trexTexture = textureLoader.load('trex_texture.png'); 
 
         function init() {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x111122);
-            scene.fog = new THREE.Fog(0x111122, 10, 60);
+            scene.background = new THREE.Color(0x050510);
+            scene.fog = new THREE.Fog(0x050510, 10, 60);
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 5, 10);
+            // 시점을 약간 조절해서 플레이어를 더 잘 보이게 함
+            camera.position.set(0, 6, 12); 
             camera.lookAt(0, 2, 0);
 
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio); // 모바일 고해상도 대응
+            renderer.setPixelRatio(window.devicePixelRatio);
             document.body.appendChild(renderer.domElement);
 
             const light = new THREE.DirectionalLight(0xffffff, 1);
-            light.position.set(5, 10, 7);
+            light.position.set(5, 10, 5);
             scene.add(light);
             scene.add(new THREE.AmbientLight(0x404040));
 
-            // 길 (Road)
-            const floorGeo = new THREE.PlaneGeometry(12, 2000);
-            const floorMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
-            const floor = new THREE.Mesh(floorGeo, floorMat);
+            // 바닥 (동일)
+            const floor = new THREE.Mesh(
+                new THREE.PlaneGeometry(12, 1000),
+                new THREE.MeshStandardMaterial({ color: 0x111111 })
+            );
             floor.rotation.x = -Math.PI / 2;
             scene.add(floor);
 
-            // 플레이어
-            const playerGeo = new THREE.BoxGeometry(1.2, 1.8, 1.2);
-            const playerMat = new THREE.MeshStandardMaterial({ color: 0x00ffcc });
+            // --- [핵심 추가: 이미지 플레이어 생성] ---
+            // 상자 대신 투명한 평면(Plane)을 사용
+            const playerGeo = new THREE.PlaneGeometry(2.5, 4); // 이미지 비율에 맞춤
+            const playerMat = new THREE.MeshStandardMaterial({ 
+                map: playerTexture, // 이미지 텍스처 입힘
+                transparent: true, // 이미지의 투명한 부분 처리
+                side: THREE.DoubleSide // 양면 다 보이게
+            });
             player = new THREE.Mesh(playerGeo, playerMat);
-            player.position.y = 0.9;
+            // 이미지가 세워져 있도록 회전
+            player.position.y = 2; // 발이 바닥에 닿게 위치
             scene.add(player);
 
-            // --- 입력 이벤트 등록 ---
-            // 1. 키보드 (PC 테스트용)
-            window.addEventListener('keydown', (e) => {
-                if (e.key.toLowerCase() === 'a') moveLeft();
-                if (e.key.toLowerCase() === 'd') moveRight();
+            // --- [핵심 추가: 이미지 T-Rex 생성] ---
+            const trexGeo = new THREE.PlaneGeometry(8, 12); // T-Rex는 더 거대하게
+            const trexMat = new THREE.MeshStandardMaterial({ 
+                map: trexTexture,
+                transparent: true,
+                side: THREE.DoubleSide
             });
+            trex = new THREE.Mesh(trexGeo, trexMat);
+            trex.position.y = 4; // 더 높게
+            trex.position.z = 25; // 더 뒤쪽에 위치
+            scene.add(trex);
 
-            // 2. 터치 이벤트 (아이폰용)
+            // 스와이프 터치 이벤트 (동일)
             window.addEventListener('touchstart', (e) => {
-                touchStartX = e.changedTouches[0].screenX;
+                touchStartX = e.touches[0].clientX;
             }, false);
 
             window.addEventListener('touchend', (e) => {
-                touchEndX = e.changedTouches[0].screenX;
-                handleSwipe();
+                let touchEndX = e.changedTouches[0].clientX;
+                let diff = touchEndX - touchStartX;
+                if (diff < -30 && currentLane > -1) currentLane--; 
+                else if (diff > 30 && currentLane < 1) currentLane++; 
             }, false);
 
             animate();
-            setInterval(spawnObstacle, 800); // 장애물 생성 속도 조절
+            setInterval(spawnObstacle, 1000);
         }
-
-        function handleSwipe() {
-            const swipeDistance = touchEndX - touchStartX;
-            const threshold = 30; // 스와이프 민감도
-
-            if (swipeDistance < -threshold) moveLeft();
-            else if (swipeDistance > threshold) moveRight();
-        }
-
-        function moveLeft() { if (currentLane > -1) currentLane--; }
-        function moveRight() { if (currentLane < 1) currentLane++; }
 
         function spawnObstacle() {
-            const geo = new THREE.BoxGeometry(2, 1.5, 1.5);
-            const mat = new THREE.MeshStandardMaterial({ color: 0xff3366 });
-            const obs = new THREE.Mesh(geo, mat);
-            
+            // 장애물 (상자로 유지하되 크기 조절)
+            const obs = new THREE.Mesh(
+                new THREE.BoxGeometry(2, 2, 1.5),
+                new THREE.MeshStandardMaterial({ color: 0xff4444 })
+            );
             const lanes = [-laneWidth, 0, laneWidth];
-            obs.position.set(lanes[Math.floor(Math.random() * 3)], 0.75, -60);
+            obs.position.set(lanes[Math.floor(Math.random() * 3)], 1, -60);
             scene.add(obs);
             obstacles.push(obs);
         }
@@ -108,38 +120,38 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            // 부드러운 레인 이동
             const targetX = currentLane * laneWidth;
-            player.position.x += (targetX - player.position.x) * 0.15;
+            player.position.x += (targetX - player.position.x) * 0.2;
 
-            // 장애물 처리
+            // T-Rex도 부드럽게 레인 이동을 따라오게 (추가 긴장감)
+            trex.position.x += (player.position.x - trex.position.x) * 0.05;
+
+            // T-Rex의 움직임 (점수에 비례)
+            trex.position.z = Math.max(25 - (score / 100), 15); 
+
             for (let i = obstacles.length - 1; i >= 0; i--) {
-                let obs = obstacles[i];
-                obs.position.z += 0.6; // 다가오는 속도
+                obstacles[i].position.z += 0.6;
 
                 // 충돌 감지 (범위 기반)
-                if (Math.abs(obs.position.z - player.position.z) < 1.2 && 
-                    Math.abs(obs.position.x - player.position.x) < 1.5) {
-                    alert("Game Over! Score: " + score);
+                if (Math.abs(obstacles[i].position.z - player.position.z) < 1.2 && 
+                    Math.abs(obstacles[i].position.x - player.position.x) < 1.5) {
+                    alert("Game Over! T-Rex에게 잡혔거나 장애물에 걸렸습니다. 당신의 점수: " + score);
                     location.reload();
                     return;
                 }
 
-                // 화면 뒤로 넘어가면 삭제
-                if (obs.position.z > 15) {
-                    scene.remove(obs);
+                if (obstacles[i].position.z > 15) {
+                    scene.remove(obstacles[i]);
                     obstacles.splice(i, 1);
                     score += 10;
                     document.getElementById('score').innerText = "Score: " + score;
                 }
             }
-
             renderer.render(scene, camera);
         }
 
         init();
 
-        // 화면 크기 조정 대응
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
