@@ -29,8 +29,10 @@
         let touchStartX = 0;
 
         const textureLoader = new THREE.TextureLoader();
+        
+        // --- [확장자 수정: 둘 다 .PNG] ---
         const playerTexture = textureLoader.load('player_texture.PNG'); 
-        const trexTexture = textureLoader.load('trex_texture.jpg'); 
+        const trexTexture = textureLoader.load('trex_texture.PNG'); 
 
         function init() {
             scene = new THREE.Scene();
@@ -38,7 +40,6 @@
             scene.fog = new THREE.Fog(0x0a0a1a, 10, 60);
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            // 카메라가 뒤에서 앞을 보게 설정 (z=12)
             camera.position.set(0, 7, 12); 
             camera.lookAt(0, 2, -5);
 
@@ -59,22 +60,28 @@
             floor.rotation.x = -Math.PI / 2;
             scene.add(floor);
 
-            // 사람 캐릭터 (z=0)
+            // 사람 캐릭터 (흰 배경 제거 설정 추가)
             const playerGeo = new THREE.PlaneGeometry(2.5, 4);
-            const playerMat = new THREE.MeshStandardMaterial({ map: playerTexture, transparent: true, side: THREE.DoubleSide });
+            const playerMat = new THREE.MeshStandardMaterial({ 
+                map: playerTexture,
+                transparent: true,
+                alphaTest: 0.5, // 이미지의 투명한 부분을 뚫고 지나가게 설정
+                side: THREE.DoubleSide
+            });
             player = new THREE.Mesh(playerGeo, playerMat);
             player.position.y = 2; 
             scene.add(player);
 
-            // --- [T-Rex 위치 대폭 수정] ---
-            const trexGeo = new THREE.PlaneGeometry(15, 22); // 크기를 더 키움
-            const trexMat = new THREE.MeshStandardMaterial({ map: trexTexture, side: THREE.DoubleSide, transparent: true });
+            // T-Rex (흰 배경 제거 설정 추가)
+            const trexGeo = new THREE.PlaneGeometry(15, 22);
+            const trexMat = new THREE.MeshStandardMaterial({ 
+                map: trexTexture,
+                transparent: true,
+                alphaTest: 0.5, // 이미지 배경이 투명하다면 흰색 상자가 안 보임
+                side: THREE.DoubleSide
+            });
             trex = new THREE.Mesh(trexGeo, trexMat);
-            
-            // 카메라(z=12)와 플레이어(z=0) 사이인 z=8로 당김
-            // y값을 낮춰서 머리 부분만 화면 아래쪽에 보이게 조절
             trex.position.set(0, -4, 8); 
-            // 살짝 눕혀서 머리가 카메라를 향하게 조절
             trex.rotation.x = -Math.PI / 6; 
             scene.add(trex);
 
@@ -105,19 +112,16 @@
 
             const targetX = currentLane * laneWidth;
             player.position.x += (targetX - player.position.x) * 0.2;
-            
-            // 공룡이 플레이어를 좌우로 따라오게 함
             trex.position.x += (player.position.x - trex.position.x) * 0.05;
 
-            // 점수가 오를수록 공룡이 조금씩 더 앞으로(플레이어 쪽으로) 다가옴
-            const dist = Math.max(8 - (score / 500), 4);
+            const dist = Math.max(8 - (score / 500), 4.5);
             trex.position.z = dist;
 
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 obstacles[i].position.z += 0.6;
                 if (Math.abs(obstacles[i].position.z - player.position.z) < 1.2 && 
                     Math.abs(obstacles[i].position.x - player.position.x) < 1.5) {
-                    alert("게임 오버! 점수: " + score);
+                    alert("공룡에게 잡혔습니다! 점수: " + score);
                     location.reload();
                     return;
                 }
