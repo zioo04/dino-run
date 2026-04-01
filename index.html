@@ -81,7 +81,7 @@
             const trexMat = new THREE.MeshStandardMaterial({ 
                 map: trexTexture, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide 
             });
-            trex = new THREE.Mesh(new THREE.PlaneGeometry(7, 13), trexMat);
+            trex = new THREE.Mesh(new THREE.PlaneGeometry(6, 9), trexMat);
             trex.position.set(0, -2, 11); 
             trex.rotation.x = -Math.PI / 10; 
             scene.add(trex);
