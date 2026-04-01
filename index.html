@@ -2,82 +2,147 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Jurassic Escape: Gyrosphere</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <title>Gyrosphere vs T-Rex</title>
     <style>
-        body { margin: 0; display: flex; justify-content: center; align-items: center; background: #222; height: 100vh; overflow: hidden; }
-        canvas { border: 4px solid #444; }
+        body { margin: 0; background: #222; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; font-family: 'Courier New', Courier, monospace; }
+        canvas { background: #4a5d23; border: 4px solid #111; image-rendering: pixelated; width: 100%; max-width: 800px; }
+        #ui { position: absolute; top: 20px; left: 20px; font-size: 20px; text-shadow: 2px 2px #000; }
     </style>
 </head>
 <body>
-<script>
-    const config = {
-        type: Phaser.AUTO,
-        width: 400,
-        height: 600,
-        physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
-        scene: { preload: preload, create: create, update: update }
-    };
+    <div id="ui">SCORE: 0</div>
+    <canvas id="gameCanvas"></canvas>
 
-    let player, tRex, cursors, score = 0, scoreText;
-    const game = new Phaser.Game(config);
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const ui = document.getElementById('ui');
 
-    function preload() {
-        // 실제 이미지가 없어도 실행되도록 색상 박스로 대체합니다.
-        this.load.image('ball', 'https://placehold.co/40x40/00ffff/white?text=O');
-        this.load.image('trex', 'https://placehold.co/80x100/ff0000/white?text=T-REX');
-        this.load.image('obs', 'https://placehold.co/50x30/555555/white?text=X');
-    }
+        // 게임 설정 (픽셀 느낌을 위해 낮은 해상도 설정)
+        canvas.width = 400;
+        canvas.height = 200;
 
-    function create() {
-        // 1. 플레이어 (자이로스피어)
-        player = this.physics.add.sprite(200, 450, 'ball').setCollideWorldBounds(true);
-        
-        // 2. 티라노사우루스 (뒤에서 쫓아옴)
-        tRex = this.add.sprite(200, 550, 'trex');
+        let score = 0;
+        let isGameOver = false;
+        let particles = [];
 
-        // 3. 장애물 그룹
-        obstacles = this.physics.add.group();
+        // 1. 자이로스피어 객체
+        const player = {
+            x: 100, y: 150, r: 15,
+            color: '#87ceeb', // 투명한 하늘색 느낌
+            speed: 5,
+            targetY: 150
+        };
 
-        // 4. 장애물 생성 타이머
-        this.time.addEvent({ delay: 1000, callback: addObstacle, callbackScope: this, loop: true });
+        // 2. 티라노사우루스 (화면 왼쪽 추격자)
+        const trex = { x: -40, y: 130, w: 60, h: 40, color: '#455a64' };
 
-        // 5. 조작키 설정
-        cursors = this.input.keyboard.createCursorKeys();
+        // 3. 장애물 관리
+        const obstacles = [];
+        function spawnObstacle() {
+            if (isGameOver) return;
+            obstacles.push({ x: 450, y: 160, w: 15, h: 15, color: '#5d4037' });
+            setTimeout(spawnObstacle, 1000 + Math.random() * 2000);
+        }
 
-        // 6. 점수 표시
-        scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '20px', fill: '#fff' });
+        // 4. 피(픽셀) 파티클 생성 함수
+        function createBlood(x, y) {
+            for (let i = 0; i < 30; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    size: Math.random() * 4 + 2,
+                    life: 1.0
+                });
+            }
+        }
 
-        // 충돌 설정
-        this.physics.add.overlap(player, obstacles, gameOver, null, this);
-    }
+        // 키 입력 처리
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'ArrowUp' && player.y > 50) player.y -= 50;
+            if (e.code === 'ArrowDown' && player.y < 150) player.y += 50;
+            if (isGameOver && e.code === 'Space') location.reload();
+        });
 
-    function update() {
-        // 좌우 이동
-        if (cursors.left.isDown) { player.setVelocityX(-250); }
-        else if (cursors.right.isDown) { player.setVelocityX(250); }
-        else { player.setVelocityX(0); }
+        function update() {
+            if (isGameOver) return;
 
-        // 티라노가 플레이어를 따라다니는 시각적 효과 (약간 좌우로 흔들림)
-        tRex.x = player.x + Math.sin(this.time.now / 100) * 10;
+            score++;
+            ui.innerText = `SCORE: ${Math.floor(score/10)}`;
 
-        // 점수 상승
-        score += 1;
-        scoreText.setText('Score: ' + score);
-    }
+            // 장애물 이동 및 충돌 체크
+            obstacles.forEach((obs, index) => {
+                obs.x -= 4; // 이동 속도
 
-    function addObstacle() {
-        let x = Phaser.Math.Between(50, 350);
-        let obstacle = obstacles.create(x, -50, 'obs');
-        obstacle.setVelocityY(300 + (score / 10)); // 갈수록 빨라짐
-    }
+                // 간단한 충돌 판정
+                if (obs.x < player.x + player.r && obs.x + obs.w > player.x - player.r &&
+                    obs.y < player.y + player.r && obs.y + obs.h > player.y - player.r) {
+                    gameOver();
+                }
 
-    function gameOver() {
-        this.physics.pause();
-        player.setTint(0xff0000);
-        alert("티라노에게 잡혔습니다! 최종 점수: " + score);
-        location.reload();
-    }
-</script>
+                if (obs.x < -20) obstacles.splice(index, 1);
+            });
+
+            // 티라노가 조금씩 다가오는 연출 (실제로는 거리가 좁혀지면 게임오버)
+        }
+
+        function gameOver() {
+            isGameOver = true;
+            createBlood(player.x, player.y);
+            // 티라노가 덮치는 연출
+            trex.x = player.x - 20; 
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 배경 바닥
+            ctx.fillStyle = '#38471a';
+            ctx.fillRect(0, 170, canvas.width, 30);
+
+            // 장애물 그리기
+            ctx.fillStyle = '#5d4037';
+            obstacles.forEach(obs => ctx.fillRect(obs.x, obs.y, obs.w, obs.h));
+
+            // 티라노사우루스 그리기 (단순 사각형)
+            ctx.fillStyle = trex.color;
+            ctx.fillRect(trex.x, trex.y, trex.w, trex.h);
+            ctx.fillStyle = '#ff0000'; // 티라노 눈
+            ctx.fillRect(trex.x + 45, trex.y + 10, 5, 5);
+
+            // 자이로스피어 그리기
+            if (!isGameOver) {
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(135, 206, 235, 0.5)';
+                ctx.fill();
+            }
+
+            // 피 파티클 그리기
+            particles.forEach((p, index) => {
+                ctx.fillStyle = `rgba(255, 0, 0, ${p.life})`;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+                p.x += p.vx; p.y += p.vy;
+                p.life -= 0.02;
+                if (p.life <= 0) particles.splice(index, 1);
+            });
+
+            if (isGameOver) {
+                ctx.fillStyle = "white";
+                ctx.font = "20px 'Courier New'";
+                ctx.fillText("GAME OVER - Press Space", 70, 100);
+            }
+
+            update();
+            requestAnimationFrame(draw);
+        }
+
+        spawnObstacle();
+        draw();
+    </script>
 </body>
 </html>
