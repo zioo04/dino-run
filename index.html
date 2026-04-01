@@ -2,91 +2,81 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Jurassic Escape Full</title>
+    <title>Jurassic Escape: Gyrosphere</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; background: #222; overflow: hidden; height: 100vh; display: flex; justify-content: center; align-items: center; }
-        canvas { display: block; }
+        body { margin: 0; display: flex; justify-content: center; align-items: center; background: #222; height: 100vh; overflow: hidden; }
+        canvas { border: 4px solid #444; }
     </style>
 </head>
 <body>
 <script>
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
-
     const config = {
         type: Phaser.AUTO,
-        width: screenWidth,
-        height: screenHeight,
+        width: 400,
+        height: 600,
         physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
         scene: { preload: preload, create: create, update: update }
     };
 
-    let player, tRex, cursors, obstacles, score = 0, scoreText;
+    let player, tRex, cursors, score = 0, scoreText;
     const game = new Phaser.Game(config);
 
     function preload() {
-        // --- 🖼️ 이미지 로드 (실제 이미지 주소로 변경했습니다) ---
-        // 1. 자이로스피어 (플레이어) - 구체 이미지
-        this.load.image('ball', 'https://labs.phaser.io/assets/sprites/pangball.png');
-        
-        // 2. 티라노사우루스 (뒤에서 쫓아옴) - 공룡 이미지
-        // 이모티콘 이미지를 사용하거나, 위에서 본 공룡 이미지를 구하기 어려워 일단 비슷한 공룡 에셋을 사용합니다.
-        this.load.image('trex', 'https://labs.phaser.io/assets/sprites/phaser-dude.png'); 
-
-        // 3. 장애물 (통나무 상자)
-        this.load.image('obs', 'https://labs.phaser.io/assets/sprites/block.png');
+        // 실제 이미지가 없어도 실행되도록 색상 박스로 대체합니다.
+        this.load.image('ball', 'https://placehold.co/40x40/00ffff/white?text=O');
+        this.load.image('trex', 'https://placehold.co/80x100/ff0000/white?text=T-REX');
+        this.load.image('obs', 'https://placehold.co/50x30/555555/white?text=X');
     }
 
     function create() {
-        // 플레이어를 화면 아래쪽에 배치
-        player = this.physics.add.sprite(screenWidth / 2, screenHeight * 0.75, 'ball');
-        player.setScale(2.5); // 플레이어 크기 확대
-        player.setCollideWorldBounds(true);
+        // 1. 플레이어 (자이로스피어)
+        player = this.physics.add.sprite(200, 450, 'ball').setCollideWorldBounds(true);
         
-        // 티라노 위치 조정 및 공룡 이미지 적용
-        tRex = this.add.sprite(screenWidth / 2, screenHeight * 0.9, 'trex');
-        tRex.setScale(3); // 티라노 크기 확대
-        tRex.setTint(0x00ff00); // 티라노를 초록색(공룡 색깔)으로 표시
+        // 2. 티라노사우루스 (뒤에서 쫓아옴)
+        tRex = this.add.sprite(200, 550, 'trex');
 
+        // 3. 장애물 그룹
         obstacles = this.physics.add.group();
-        this.time.addEvent({ delay: 800, callback: addObstacle, callbackScope: this, loop: true });
 
-        // 점수 표시를 더 크게
-        scoreText = this.add.text(screenWidth / 2, 50, 'Score: 0', { fontSize: '48px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
+        // 4. 장애물 생성 타이머
+        this.time.addEvent({ delay: 1000, callback: addObstacle, callbackScope: this, loop: true });
 
+        // 5. 조작키 설정
+        cursors = this.input.keyboard.createCursorKeys();
+
+        // 6. 점수 표시
+        scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '20px', fill: '#fff' });
+
+        // 충돌 설정
         this.physics.add.overlap(player, obstacles, gameOver, null, this);
     }
 
     function update() {
-        // 모바일 터치 조작 (화면 왼쪽/오른쪽 터치)
-        if (this.input.activePointer.isDown) {
-            if (this.input.activePointer.x < screenWidth / 2) {
-                player.setVelocityX(-450); // 속도 증가
-            } else {
-                player.setVelocityX(450);
-            }
-        } else {
-            player.setVelocityX(0);
-        }
+        // 좌우 이동
+        if (cursors.left.isDown) { player.setVelocityX(-250); }
+        else if (cursors.right.isDown) { player.setVelocityX(250); }
+        else { player.setVelocityX(0); }
 
-        tRex.x = player.x; // 티라노가 플레이어를 추적하는 효과
+        // 티라노가 플레이어를 따라다니는 시각적 효과 (약간 좌우로 흔들림)
+        tRex.x = player.x + Math.sin(this.time.now / 100) * 10;
+
+        // 점수 상승
         score += 1;
         scoreText.setText('Score: ' + score);
     }
 
     function addObstacle() {
-        let x = Phaser.Math.Between(50, screenWidth - 50);
+        let x = Phaser.Math.Between(50, 350);
         let obstacle = obstacles.create(x, -50, 'obs');
-        obstacle.setScale(2.5); // 장애물 크기 확대
-        obstacle.setVelocityY(450 + (score / 15)); // 속도감 있게 조정
+        obstacle.setVelocityY(300 + (score / 10)); // 갈수록 빨라짐
     }
 
     function gameOver() {
         this.physics.pause();
-        const overText = this.add.text(screenWidth / 2, screenHeight / 2, 'GAME OVER', { fontSize: '80px', fill: '#ff0000', fontStyle: 'bold' }).setOrigin(0.5);
-        this.time.delayedCall(2000, () => location.reload(), [], this);
+        player.setTint(0xff0000);
+        alert("티라노에게 잡혔습니다! 최종 점수: " + score);
+        location.reload();
     }
 </script>
 </body>
