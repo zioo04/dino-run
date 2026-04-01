@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Jurassic Escape: Gyrosphere</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <style>
+        body { margin: 0; display: flex; justify-content: center; align-items: center; background: #222; height: 100vh; overflow: hidden; }
+        canvas { border: 4px solid #444; }
+    </style>
+</head>
+<body>
+<script>
+    const config = {
+        type: Phaser.AUTO,
+        width: 400,
+        height: 600,
+        physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
+        scene: { preload: preload, create: create, update: update }
+    };
+
+    let player, tRex, cursors, score = 0, scoreText;
+    const game = new Phaser.Game(config);
+
+    function preload() {
+        // 실제 이미지가 없어도 실행되도록 색상 박스로 대체합니다.
+        this.load.image('ball', 'https://placehold.co/40x40/00ffff/white?text=O');
+        this.load.image('trex', 'https://placehold.co/80x100/ff0000/white?text=T-REX');
+        this.load.image('obs', 'https://placehold.co/50x30/555555/white?text=X');
+    }
+
+    function create() {
+        // 1. 플레이어 (자이로스피어)
+        player = this.physics.add.sprite(200, 450, 'ball').setCollideWorldBounds(true);
+        
+        // 2. 티라노사우루스 (뒤에서 쫓아옴)
+        tRex = this.add.sprite(200, 550, 'trex');
+
+        // 3. 장애물 그룹
+        obstacles = this.physics.add.group();
+
+        // 4. 장애물 생성 타이머
+        this.time.addEvent({ delay: 1000, callback: addObstacle, callbackScope: this, loop: true });
+
+        // 5. 조작키 설정
+        cursors = this.input.keyboard.createCursorKeys();
+
+        // 6. 점수 표시
+        scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '20px', fill: '#fff' });
+
+        // 충돌 설정
+        this.physics.add.overlap(player, obstacles, gameOver, null, this);
+    }
+
+    function update() {
+        // 좌우 이동
+        if (cursors.left.isDown) { player.setVelocityX(-250); }
+        else if (cursors.right.isDown) { player.setVelocityX(250); }
+        else { player.setVelocityX(0); }
+
+        // 티라노가 플레이어를 따라다니는 시각적 효과 (약간 좌우로 흔들림)
+        tRex.x = player.x + Math.sin(this.time.now / 100) * 10;
+
+        // 점수 상승
+        score += 1;
+        scoreText.setText('Score: ' + score);
+    }
+
+    function addObstacle() {
+        let x = Phaser.Math.Between(50, 350);
+        let obstacle = obstacles.create(x, -50, 'obs');
+        obstacle.setVelocityY(300 + (score / 10)); // 갈수록 빨라짐
+    }
+
+    function gameOver() {
+        this.physics.pause();
+        player.setTint(0xff0000);
+        alert("티라노에게 잡혔습니다! 최종 점수: " + score);
+        location.reload();
+    }
+</script>
+</body>
+</html>
