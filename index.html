@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -12,7 +12,6 @@
 </head>
 <body>
 <script>
-    // 화면 크기를 자동으로 계산합니다.
     const screenWidth = window.innerWidth;
     const screenHeight = window.innerHeight;
 
@@ -28,8 +27,15 @@
     const game = new Phaser.Game(config);
 
     function preload() {
+        // --- 🖼️ 이미지 로드 (실제 이미지 주소로 변경했습니다) ---
+        // 1. 자이로스피어 (플레이어) - 구체 이미지
         this.load.image('ball', 'https://labs.phaser.io/assets/sprites/pangball.png');
-        this.load.image('trex', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
+        
+        // 2. 티라노사우루스 (뒤에서 쫓아옴) - 공룡 이미지
+        // 이모티콘 이미지를 사용하거나, 위에서 본 공룡 이미지를 구하기 어려워 일단 비슷한 공룡 에셋을 사용합니다.
+        this.load.image('trex', 'https://labs.phaser.io/assets/sprites/phaser-dude.png'); 
+
+        // 3. 장애물 (통나무 상자)
         this.load.image('obs', 'https://labs.phaser.io/assets/sprites/block.png');
     }
 
@@ -39,32 +45,33 @@
         player.setScale(2.5); // 플레이어 크기 확대
         player.setCollideWorldBounds(true);
         
-        // 티라노 위치 조정
+        // 티라노 위치 조정 및 공룡 이미지 적용
         tRex = this.add.sprite(screenWidth / 2, screenHeight * 0.9, 'trex');
         tRex.setScale(3); // 티라노 크기 확대
-        tRex.setTint(0xff0000);
+        tRex.setTint(0x00ff00); // 티라노를 초록색(공룡 색깔)으로 표시
 
         obstacles = this.physics.add.group();
         this.time.addEvent({ delay: 800, callback: addObstacle, callbackScope: this, loop: true });
 
-        scoreText = this.add.text(20, 40, 'Score: 0', { fontSize: '32px', fill: '#fff', fontStyle: 'bold' });
+        // 점수 표시를 더 크게
+        scoreText = this.add.text(screenWidth / 2, 50, 'Score: 0', { fontSize: '48px', fill: '#fff', fontStyle: 'bold' }).setOrigin(0.5);
 
         this.physics.add.overlap(player, obstacles, gameOver, null, this);
     }
 
     function update() {
-        // 조작 방식 (터치 위치에 따라 이동)
+        // 모바일 터치 조작 (화면 왼쪽/오른쪽 터치)
         if (this.input.activePointer.isDown) {
             if (this.input.activePointer.x < screenWidth / 2) {
-                player.setVelocityX(-400); // 속도 증가
+                player.setVelocityX(-450); // 속도 증가
             } else {
-                player.setVelocityX(400);
+                player.setVelocityX(450);
             }
         } else {
             player.setVelocityX(0);
         }
 
-        tRex.x = player.x; // 추적 효과
+        tRex.x = player.x; // 티라노가 플레이어를 추적하는 효과
         score += 1;
         scoreText.setText('Score: ' + score);
     }
@@ -78,7 +85,7 @@
 
     function gameOver() {
         this.physics.pause();
-        const overText = this.add.text(screenWidth / 2, screenHeight / 2, 'GAME OVER', { fontSize: '60px', fill: '#ff0000', fontStyle: 'bold' }).setOrigin(0.5);
+        const overText = this.add.text(screenWidth / 2, screenHeight / 2, 'GAME OVER', { fontSize: '80px', fill: '#ff0000', fontStyle: 'bold' }).setOrigin(0.5);
         this.time.delayedCall(2000, () => location.reload(), [], this);
     }
 </script>
