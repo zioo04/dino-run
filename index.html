@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Jurassic Escape: Gyrosphere</title>
+    <title>Jurassic Escape</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
     <style>
         body { margin: 0; display: flex; justify-content: center; align-items: center; background: #222; height: 100vh; overflow: hidden; }
@@ -19,67 +19,43 @@
         scene: { preload: preload, create: create, update: update }
     };
 
-    let player, tRex, cursors, score = 0, scoreText;
+    let player, tRex, cursors, obstacles, score = 0, scoreText;
     const game = new Phaser.Game(config);
 
     function preload() {
-        // --- 🖼️ 이미지 로드 (실제 무료 에셋 주소로 변경했습니다) ---
-        // 1. 자이로스피어 (플레이어) - 투명한 구체 이미지
-        this.load.image('ball', 'https://raw.githubusercontent.com/rexrainbow/phaser3-rex-notes/master/assets/images/ball.png');
-        
-        // 2. 티라노사우루스 (뒤에서 쫓아옴) - 위에서 본 공룡 이미지
-        this.load.image('trex', 'https://raw.githubusercontent.com/rexrainbow/phaser3-rex-notes/master/assets/images/pig.png'); // 일단 돼지 이미지로 대체 (위에서 본 공룡 무료 에셋이 드뭅니다)
-        
-        // 3. 장애물 (통나무)
-        this.load.image('obs', 'https://raw.githubusercontent.com/rexrainbow/phaser3-rex-notes/master/assets/images/crate.png'); // 나무 상자 이미지
+        // 이미지 경로를 더 안정적인 주소로 변경했습니다.
+        this.load.image('ball', 'https://labs.phaser.io/assets/sprites/pangball.png');
+        this.load.image('trex', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
+        this.load.image('obs', 'https://labs.phaser.io/assets/sprites/block.png');
     }
 
     function create() {
-        // --- 🏗️ 이미지 배치 및 크기 조절 ---
-        // 1. 플레이어 (자이로스피어)
         player = this.physics.add.sprite(200, 450, 'ball');
-        player.setScale(0.8); // 크기 조절 (80%)
         player.setCollideWorldBounds(true);
         
-        // 2. 티라노사우루스 (뒤에서 쫓아옴)
         tRex = this.add.sprite(200, 550, 'trex');
-        tRex.setScale(1.5); // 크기 조절 (150%)
-        tRex.setTint(0xff8888); // 빨간색 틴트 효과 (압박감)
+        tRex.setTint(0xff0000); // 티라노를 빨갛게 표시
 
-        // 3. 장애물 그룹
         obstacles = this.physics.add.group();
-
-        // 4. 장애물 생성 타이머
         this.time.addEvent({ delay: 1000, callback: addObstacle, callbackScope: this, loop: true });
 
-        // 5. 조작키 설정
         cursors = this.input.keyboard.createCursorKeys();
+        scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '20px', fill: '#fff' });
 
-        // 6. 점수 표시
-        scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '20px', fill: '#fff', fontStyle: 'bold' });
-
-        // 충돌 설정
         this.physics.add.overlap(player, obstacles, gameOver, null, this);
     }
 
     function update() {
-        // --- 🕹️ 조작 (모바일/PC 공용) ---
-        if (cursors.left.isDown || this.input.activePointer.isDown && this.input.activePointer.x < 200) {
+        // 모바일 터치 및 키보드 조작
+        if (cursors.left.isDown || (this.input.activePointer.isDown && this.input.activePointer.x < 200)) {
             player.setVelocityX(-250);
-        } else if (cursors.right.isDown || this.input.activePointer.isDown && this.input.activePointer.x > 200) {
+        } else if (cursors.right.isDown || (this.input.activePointer.isDown && this.input.activePointer.x > 200)) {
             player.setVelocityX(250);
         } else {
             player.setVelocityX(0);
         }
 
-        // --- ✨ 시각 효과 ---
-        // 자이로스피어 회전 (굴러가는 느낌)
-        player.angle += 10 * Time.deltaTime;
-
-        // 티라노가 플레이어를 따라다니는 시각적 효과 (약간 좌우로 흔들림)
-        tRex.x = player.x + Math.sin(this.time.now / 100) * 15;
-
-        // 점수 상승
+        tRex.x = player.x; // 티라노가 플레이어를 추적하는 효과
         score += 1;
         scoreText.setText('Score: ' + score);
     }
@@ -87,19 +63,12 @@
     function addObstacle() {
         let x = Phaser.Math.Between(50, 350);
         let obstacle = obstacles.create(x, -50, 'obs');
-        obstacle.setScale(0.6); // 장애물 크기 조절
-        obstacle.setVelocityY(300 + (score / 10)); // 갈수록 빨라짐
+        obstacle.setVelocityY(300 + (score / 10));
     }
 
     function gameOver() {
         this.physics.pause();
-        player.setTint(0xff0000); // 플레이어 빨갛게
-        tRex.setTint(0xff0000); // 티라노 빨갛게
-        
-        this.add.text(100, 300, 'GAME OVER', { fontSize: '40px', fill: '#fff', fontStyle: 'bold' });
-        this.add.text(120, 350, '잡혔습니다!', { fontSize: '24px', fill: '#fff' });
-        
-        // 2초 뒤 재시작
+        this.add.text(100, 300, 'GAME OVER', { fontSize: '40px', fill: '#ff0000' });
         this.time.delayedCall(2000, () => location.reload(), [], this);
     }
 </script>
