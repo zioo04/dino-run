@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dino Runner - Portfolio</title>
+
+<style>
+body {
+    margin: 0;
+    overflow: hidden;
+    background: #0f172a;
+    font-family: sans-serif;
+}
+
+/* UI */
+#ui {
+    position: absolute;
+    top: 20px;
+    width: 100%;
+    text-align: center;
+    color: white;
+    z-index: 10;
+}
+
+#score {
+    font-size: 28px;
+    font-weight: bold;
+}
+
+/* 시작 / 게임오버 화면 */
+.overlay {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.75);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    color: white;
+    z-index: 20;
+}
+
+button {
+    padding: 12px 20px;
+    font-size: 18px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+/* 랭킹 */
+#ranking {
+    position: absolute;
+    top: 120px;
+    width: 100%;
+    text-align: center;
+    color: white;
+    z-index: 5;
+}
+
+.rank-item {
+    font-size: 18px;
+    margin: 4px 0;
+}
+
+.top1 { color: gold; font-weight: bold; }
+.top2 { color: silver; font-weight: bold; }
+.top3 { color: #cd7f32; font-weight: bold; }
+</style>
+</head>
+
+<body>
+
+<!-- ================= UI ================= -->
+<div id="ui">
+    <div id="score">Score: 0</div>
+</div>
+
+<div id="ranking"></div>
+
+<!-- 시작 화면 -->
+<div id="startScreen" class="overlay">
+    <h1>🦖 Dino Runner</h1>
+    <p>Start 버튼을 눌러 시작</p>
+    <button onclick="startGame()">START</button>
+</div>
+
+<!-- 게임오버 화면 -->
+<div id="gameOverScreen" class="overlay" style="display:none;">
+    <h1>GAME OVER</h1>
+    <p id="finalScore"></p>
+    <button onclick="restartGame()">RESTART</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+/* =========================
+   README (포폴 설명용)
+========================= */
+/*
+📌 Project: Dino Runner (3D Browser Game)
+
+📌 Tech Stack:
+- HTML / CSS / JavaScript
+- Three.js
+- LocalStorage (pseudo DB)
+
+📌 Features:
+- 3D endless runner game
+- Score system
+- Collision detection
+- Ranking system (Top 5)
+- Start / Game Over UI
+- Mobile + Keyboard controls
+
+📌 What I learned:
+- Three.js basics
+- Game loop structure
+- State management (gameState)
+- LocalStorage 활용
+- UI/UX flow 설계
+*/
+
+/* =========================
+   GAME STATE
+========================= */
+let scene, camera, renderer;
+let player;
+let obstacles = [];
+
+let score = 0;
+let lane = 0;
+const laneWidth = 3;
+
+let gameState = "ready"; // ready | playing | over
+
+/* =========================
+   INIT
+========================= */
+function init() {
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0f172a);
+    scene.fog = new THREE.Fog(0x0f172a, 10, 60);
+
+    camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
+    camera.position.set(0,7,12);
+
+    renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // light
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5,10,5);
+    scene.add(light);
+
+    // floor
+    const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(20, 1000),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b })
+    );
+    floor.rotation.x = -Math.PI/2;
+    scene.add(floor);
+
+    // player
+    player = new THREE.Mesh(
+        new THREE.BoxGeometry(1.5,1.5,1.5),
+        new THREE.MeshStandardMaterial({ color: 0x22c55e })
+    );
+    player.position.y = 1;
+    scene.add(player);
+
+    // controls
+    window.addEventListener("keydown",(e)=>{
+        if(e.key === "ArrowLeft") lane--;
+        if(e.key === "ArrowRight") lane++;
+        lane = Math.max(-1,Math.min(1,lane));
+    });
+
+    setInterval(spawnObstacle, 900);
+
+    animate();
+}
+
+/* =========================
+   START / RESTART
+========================= */
+function startGame(){
+    document.getElementById("startScreen").style.display = "none";
+    gameState = "playing";
+}
+
+function restartGame(){
+    location.reload();
+}
+
+/* =========================
+   OBSTACLE
+========================= */
+function spawnObstacle(){
+    if(gameState !== "playing") return;
+
+    const box = new THREE.Mesh(
+        new THREE.BoxGeometry(1.5,1.5,1.5),
+        new THREE.MeshStandardMaterial({ color: 0xef4444 })
+    );
+
+    const lanes = [-laneWidth,0,laneWidth];
+    box.position.set(lanes[Math.floor(Math.random()*3)],1,-50);
+
+    scene.add(box);
+    obstacles.push(box);
+}
+
+/* =========================
+   SCORE DB (localStorage)
+========================= */
+function saveScore(s){
+    let data = JSON.parse(localStorage.getItem("dinoScores")) || [];
+    data.push(s);
+    data.sort((a,b)=>b-a);
+    data = data.slice(0,5);
+    localStorage.setItem("dinoScores", JSON.stringify(data));
+}
+
+/* =========================
+   RANKING UI
+========================= */
+function showRanking(){
+    let data = JSON.parse(localStorage.getItem("dinoScores")) || [];
+
+    let html = "<h2>🏆 RANKING</h2>";
+
+    data.forEach((s,i)=>{
+        let cls = "";
+        if(i===0) cls="top1";
+        if(i===1) cls="top2";
+        if(i===2) cls="top3";
+
+        html += `<div class="rank-item ${cls}">
+            ${i+1}위 - ${s}
+        </div>`;
+    });
+
+    document.getElementById("ranking").innerHTML = html;
+}
+
+/* =========================
+   GAME LOOP
+========================= */
+function animate(){
+    requestAnimationFrame(animate);
+
+    if(gameState !== "playing"){
+        renderer.render(scene,camera);
+        return;
+    }
+
+    player.position.x += ((lane*laneWidth)-player.position.x)*0.2;
+
+    for(let i=obstacles.length-1;i>=0;i--){
+        let o = obstacles[i];
+        o.position.z += 0.7;
+
+        // collision
+        if(Math.abs(o.position.z-player.position.z)<1 &&
+           Math.abs(o.position.x-player.position.x)<1){
+
+            gameState = "over";
+
+            saveScore(score);
+            showRanking();
+
+            document.getElementById("finalScore").innerText =
+                "Score: " + score;
+
+            document.getElementById("gameOverScreen").style.display = "flex";
+            return;
+        }
+
+        if(o.position.z > 10){
+            scene.remove(o);
+            obstacles.splice(i,1);
+
+            score += 10;
+            document.getElementById("score").innerText = "Score: " + score;
+        }
+    }
+
+    renderer.render(scene,camera);
+}
+
+/* =========================
+   START INIT
+========================= */
+init();
+showRanking();
+
+window.addEventListener("resize",()=>{
+    camera.aspect = innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+
+</body>
+</html>
