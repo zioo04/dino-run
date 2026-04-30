@@ -1,0 +1,217 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dino Runner Portfolio</title>
+
+<style>
+body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+#ui { position: absolute; top: 20px; width: 100%; text-align: center; color: white; z-index: 10; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+#score { font-size: 28px; font-weight: bold; }
+#ranking { position: absolute; top: 120px; width: 100%; text-align: center; color: white; text-shadow: 1px 1px 3px rgba(0,0,0,0.8); }
+.overlay { position: absolute; width: 100%; height: 100%; background: rgba(0,0,0,0.75); display: flex; justify-content: center; align-items: center; flex-direction: column; color: white; z-index: 20; }
+button { padding: 12px 24px; font-size: 18px; border: none; border-radius: 10px; cursor: pointer; margin-top: 10px; background: #ff4500; color: white; font-weight: bold; }
+.badge { display: inline-block; padding: 6px 14px; background: rgba(255,255,255,0.15); border-radius: 20px; margin-top: 8px; }
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+    <div id="score">Score: 0</div>
+    <div class="badge">🦖 Dino Runner Portfolio Project</div>
+</div>
+
+<div id="ranking"></div>
+
+<div id="startScreen" class="overlay">
+    <h1>🦖 Dino Runner</h1>
+    <p>세로 모드에 최적화되었습니다</p>
+    <button onclick="startGame()">START</button>
+</div>
+
+<div id="gameOverScreen" class="overlay" style="display:none;">
+    <h1>GAME OVER</h1>
+    <p id="finalScore"></p>
+    <button onclick="restartGame()">RESTART</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/loaders/GLTFLoader.js"></script>
+
+<script>
+let scene, camera, renderer, gltfLoader;
+let player, obstacles = [];
+let score = 0;
+let lane = 0;
+const laneWidth = 3;
+let gameState = "ready";
+
+function init() {
+    scene = new THREE.Scene();
+    
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.load('background.JPG', (texture) => {
+        scene.background = texture;
+    });
+
+    scene.fog = new THREE.Fog(0x1a0b2e, 15, 60);
+
+    camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
+    camera.position.set(0, 5, 12);
+
+    renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    document.body.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    const light = new THREE.DirectionalLight(0xffffff, 0.8);
+    light.position.set(5,10,5);
+    scene.add(light);
+    
+    const pointLight = new THREE.PointLight(0xff4500, 2, 20); 
+    pointLight.position.set(0, 5, 5);
+    scene.add(pointLight);
+
+    const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(20, 1000),
+        new THREE.MeshStandardMaterial({ color: 0x000000, transparent: true, opacity: 0.3 })
+    );
+    floor.rotation.x = -Math.PI/2;
+    scene.add(floor);
+
+    gltfLoader = new THREE.GLTFLoader();
+
+    gltfLoader.load('dino.glb', (gltf) => {
+        player = gltf.scene;
+        player.scale.set(1.5, 1.5, 1.5);
+        player.position.y = 0;
+        player.rotation.y = Math.PI;
+        scene.add(player);
+    });
+
+    window.addEventListener("touchstart", e => startX = e.touches[0].clientX);
+    window.addEventListener("touchend", movePlayer);
+    window.addEventListener("keydown",(e)=>{
+        if(e.key === "ArrowLeft") lane--;
+        if(e.key === "ArrowRight") lane++;
+        lane = Math.max(-1, Math.min(1, lane));
+    });
+
+    setInterval(spawnObstacle, 900);
+    animate();
+}
+
+function startGame(){
+    if(!player) return; 
+    document.getElementById("startScreen").style.display = "none";
+    gameState = "playing";
+}
+
+function restartGame(){
+    location.reload();
+}
+
+// ---------------------------------------------------------
+// 수정된 부분: 운석 사이즈를 기존 0.5에서 0.25로 한 번 더 줄임
+// ---------------------------------------------------------
+function spawnObstacle(){
+    if(gameState !== "playing") return;
+
+    gltfLoader.load('meteor.glb', (gltf) => {
+        const meteor = gltf.scene.clone(); 
+        const lanes = [-laneWidth, 0, laneWidth];
+        
+        meteor.position.set(lanes[Math.floor(Math.random()*3)], 1, -60);
+        
+        // --- 사이즈를 0.25로 설정 (기존의 절반) ---
+        meteor.scale.set(0.25, 0.25, 0.25); 
+        
+        scene.add(meteor);
+        obstacles.push(meteor);
+    });
+}
+
+function saveScore(s){
+    let data = JSON.parse(localStorage.getItem("dinoScores")) || [];
+    data.push(s);
+    data.sort((a,b)=>b-a);
+    data = data.slice(0,5);
+    localStorage.setItem("dinoScores", JSON.stringify(data));
+}
+
+function showRanking(){
+    let data = JSON.parse(localStorage.getItem("dinoScores")) || [];
+    let html = "<h2>🏆 RANKING</h2>";
+    data.forEach((s,i)=>{
+        html += `<div>${i+1}위 - ${s}</div>`;
+    });
+    document.getElementById("ranking").innerHTML = html;
+}
+
+function animate(){
+    requestAnimationFrame(animate);
+
+    if(gameState !== "playing"){
+        renderer.render(scene, camera);
+        return;
+    }
+
+    if(player) {
+        player.position.x += ((lane * laneWidth) - player.position.x) * 0.15;
+    }
+
+    for(let i=obstacles.length-1; i>=0; i--){
+        let o = obstacles[i];
+        o.position.z += 0.8; 
+        o.rotation.x += 0.05; 
+        o.rotation.y += 0.05;
+
+        // ---------------------------------------------------------
+        // 수정된 부분: 운석이 매우 작아졌으므로 충돌 범위를 0.4로 더 축소
+        // ---------------------------------------------------------
+        if(player && Math.abs(o.position.z - player.position.z) < 0.4 &&
+           Math.abs(o.position.x - player.position.x) < 0.4){
+
+            gameState = "over";
+            saveScore(score);
+            showRanking();
+            document.getElementById("finalScore").innerText = "Score: " + score;
+            document.getElementById("gameOverScreen").style.display = "flex";
+            return;
+        }
+
+        if(o.position.z > 15){
+            scene.remove(o);
+            obstacles.splice(i,1);
+            score += 10;
+            document.getElementById("score").innerText = "Score: " + score;
+        }
+    }
+
+    renderer.render(scene, camera);
+}
+
+let startX = 0;
+function movePlayer(e){
+    let diff = e.changedTouches[0].clientX - startX;
+    if(diff > 30) lane++;
+    else if(diff < -30) lane--;
+    lane = Math.max(-1, Math.min(1, lane));
+}
+
+init();
+showRanking();
+
+window.addEventListener("resize", ()=>{
+    camera.aspect = innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+
+</body>
+</html>
