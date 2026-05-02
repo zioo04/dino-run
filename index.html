@@ -228,8 +228,8 @@ function animate(){
         }
 
         if(player && 
-           Math.abs(o.position.z - player.position.z) < 1.0 &&
-           Math.abs(o.position.x - player.position.x) < 0.8 &&
+           Math.abs(o.position.z - player.position.z) < 1.1 &&
+           Math.abs(o.position.x - player.position.x) < 0.9 &&
            Math.abs(o.position.y - player.position.y) < 1.2) {
             gameState = "over";
             saveScore(score);
