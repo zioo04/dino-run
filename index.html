@@ -165,7 +165,7 @@ function spawnObstacle(){
         const lanes = [-laneWidth, 0, laneWidth];
         
         meteor.position.set(lanes[Math.floor(Math.random()*3)], 1, -60);
-        meteor.scale.set(10.0, 10.0, 10.0); 
+        meteor.scale.set(50.0, 50.0, 50.0); 
         
         scene.add(meteor);
         obstacles.push(meteor);
