@@ -96,7 +96,7 @@ function init() {
 
     gltfLoader.load('dino.glb', (gltf) => {
         player = gltf.scene;
-        player.scale.set(1.5, 1.5, 1.5);
+        player.scale.set(1.0, 1.0, 1.0);
         player.position.y = 0;
         player.rotation.y = Math.PI;
         scene.add(player);
